@@ -3,6 +3,11 @@ name = "bcp"
 version = "0.1.0"
 authors = ["Simon Heath <icefox@dreamquest.io>"]
 edition = "2018"
+description = "A replacement for the Unix `dd` program."
+license = "Apache-2"
+repository = "https://github.com/icefoxen/bcp"
+keywords = ["file", "cli", "terminal"]
+categories = ["command-line-utilities", "filesystem"]
 
 [dependencies]
 structopt = "0.2"
