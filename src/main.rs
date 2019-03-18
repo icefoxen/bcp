@@ -1,5 +1,5 @@
 use std::fs;
-use std::io::{self, BufReader, BufWriter, Read, Seek, Write};
+use std::io::{self, Read, Seek, Write};
 use std::path::PathBuf;
 use std::process;
 
@@ -13,23 +13,23 @@ const BUFSIZE: usize = 1024 * 1024;
 #[structopt(raw(global_settings = "&[AppSettings::DeriveDisplayOrder]"))]
 struct Opt {
     /// The source file to copy from.
-    #[structopt(short = "s", long = "src", parse(from_os_str))]
+    #[structopt(name = "SRC", parse(from_os_str))]
     src: PathBuf,
 
     /// The destination file to copy to.  Will create the file
     /// if it does not exist.
-    #[structopt(short = "d", long = "dst", parse(from_os_str))]
+    #[structopt(name = "DST", parse(from_os_str))]
     dst: PathBuf,
 
     /// The byte offset in the source file to start reading from.
     /// Must not be larger than the file in question.
-    #[structopt(short = "i", long = "src-offset", default_value = "0")]
+    #[structopt(short = "s", long = "src-offset", default_value = "0")]
     src_offset: u64,
 
     /// The byte offset in the destination file to start writing to.
     /// Must not be larger than the file in question, and the file
     /// must exist.
-    #[structopt(short = "o", long = "dst-offset", default_value = "0")]
+    #[structopt(short = "d", long = "dst-offset", default_value = "0")]
     dst_offset: u64,
 
     /// The number of bytes to copy.  Defaults to "all of them",
@@ -112,29 +112,6 @@ fn copy_stuff(opt: &Opt, src_len: u64) {
     dst.seek(io::SeekFrom::Start(opt.dst_offset))
         .expect("Should never happen?");
 
-    /*
-    // ...hmmm.
-    // Rewriting our own `io::copy()` and doing our own
-    // buffering might honestly be nicer.
-    let src = &mut BufReader::with_capacity(BUFSIZE, src);
-    let dst = &mut BufWriter::with_capacity(BUFSIZE, dst);
-
-    if let Some(c) = opt.count {
-        let src = &mut src.take(c);
-        let _ = io::copy(src, dst).unwrap_or_else(|e| {
-            let errmsg = format!("Error while copying: {:?}", e);
-            error(&errmsg);
-        });
-    } else {
-        let _ = io::copy(src, dst).unwrap_or_else(|e| {
-            let errmsg = format!("Error while copying: {:?}", e);
-            error(&errmsg);
-        });
-    }
-     */
-
-    // TODO: Verify.  The box is annoying.
-    // But not having it is also annoying.
     let copy_len = opt.count.unwrap_or(src_len);
     let mut src = src.take(copy_len);
 
@@ -148,7 +125,6 @@ fn copy_stuff(opt: &Opt, src_len: u64) {
         None
     };
     let mut buf = vec![0; BUFSIZE];
-    let mut written = 0;
     loop {
         let len = match src.read(&mut buf) {
             Ok(0) => break,
@@ -163,7 +139,6 @@ fn copy_stuff(opt: &Opt, src_len: u64) {
             let errmsg = format!("Error reading file: {:?}", e);
             error(&errmsg)
         });
-        written += len as u64;
         if let Some(ref mut p) = pb {
             p.add(len as u64);
         }
@@ -172,7 +147,7 @@ fn copy_stuff(opt: &Opt, src_len: u64) {
 
 fn main() {
     let opt = Opt::from_args();
-    println!("{:#?}", opt);
+    //println!("{:#?}", opt);
     let src_len = sanity_check(&opt);
     copy_stuff(&opt, src_len);
 }
