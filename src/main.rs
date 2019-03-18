@@ -1,14 +1,16 @@
 use std::fs;
-use std::io::{self, BufReader, BufWriter, Read, Seek};
+use std::io::{self, BufReader, BufWriter, Read, Seek, Write};
 use std::path::PathBuf;
 use std::process;
-use structopt::{StructOpt, clap::AppSettings};
+
+use pbr;
+use structopt::{clap::AppSettings, StructOpt};
 
 /// Size of the copy buffer to use: 1 MB.
 const BUFSIZE: usize = 1024 * 1024;
 
 #[derive(Debug, StructOpt)]
-#[structopt(raw(global_settings="&[AppSettings::DeriveDisplayOrder]"))]
+#[structopt(raw(global_settings = "&[AppSettings::DeriveDisplayOrder]"))]
 struct Opt {
     /// The source file to copy from.
     #[structopt(short = "s", long = "src", parse(from_os_str))]
@@ -35,6 +37,10 @@ struct Opt {
     /// read past the end of the source file is an error.
     #[structopt(short = "c", long = "count")]
     count: Option<u64>,
+
+    /// Verbose output, with progress bar.
+    #[structopt(short = "v", long = "verbose")]
+    verbose: bool,
 }
 
 /// Print an error message and quit.
@@ -44,7 +50,9 @@ fn error(msg: &str) -> ! {
 }
 
 /// Exits if the command line options don't make sense.
-fn sanity_check(opt: &Opt) {
+/// Returns the source file length, 'cause it's handy and
+/// there's no point in asking for it twice.
+fn sanity_check(opt: &Opt) -> u64 {
     // Check src file length.
     let src_metadata = opt.src.metadata().unwrap_or_else(|e| {
         let errmsg = format!("Could not get metadata for source file: {:?}", e);
@@ -74,17 +82,24 @@ fn sanity_check(opt: &Opt) {
             error(&errmsg)
         });
         // TODO: Double-check for off-by-one
+        //println!("{} < {} ?", dst_metadata.len(), opt.dst_offset);
         if dst_metadata.len() < opt.dst_offset {
             error("destination offset > destination file size");
         }
+    } else {
+        if opt.dst_offset > 0 {
+            error("destination file cannot have an offset if the file does not exist; the results of trying to seek past the end of a file are system-defined and thus probably not what you want.")
+        }
     }
+
+    src_len
 }
 
 /// Actually do the copy.
-fn copy_stuff(opt: &Opt) {
+fn copy_stuff(opt: &Opt, src_len: u64) {
     let mut src = fs::File::open(&opt.src).expect("Should never happen?");
     let mut dst = fs::OpenOptions::new()
-        .append(true)
+        .write(true)
         .create(true)
         .open(&opt.dst)
         .unwrap_or_else(|e| {
@@ -97,6 +112,7 @@ fn copy_stuff(opt: &Opt) {
     dst.seek(io::SeekFrom::Start(opt.dst_offset))
         .expect("Should never happen?");
 
+    /*
     // ...hmmm.
     // Rewriting our own `io::copy()` and doing our own
     // buffering might honestly be nicer.
@@ -115,13 +131,50 @@ fn copy_stuff(opt: &Opt) {
             error(&errmsg);
         });
     }
+     */
+
+    // TODO: Verify.  The box is annoying.
+    // But not having it is also annoying.
+    let copy_len = opt.count.unwrap_or(src_len);
+    let mut src = src.take(copy_len);
+
+    // Basically stolen from io::copy().
+    // We want a little more control over what's happening.
+    let mut pb = if opt.verbose {
+        let mut bar = pbr::ProgressBar::new(copy_len);
+        bar.set_units(pbr::Units::Bytes);
+        Some(bar)
+    } else {
+        None
+    };
+    let mut buf = vec![0; BUFSIZE];
+    let mut written = 0;
+    loop {
+        let len = match src.read(&mut buf) {
+            Ok(0) => break,
+            Ok(len) => len,
+            Err(ref e) if e.kind() == io::ErrorKind::Interrupted => continue,
+            Err(e) => {
+                let errmsg = format!("Error reading file: {:?}", e);
+                error(&errmsg)
+            }
+        };
+        dst.write_all(&buf[..len]).unwrap_or_else(|e| {
+            let errmsg = format!("Error reading file: {:?}", e);
+            error(&errmsg)
+        });
+        written += len as u64;
+        if let Some(ref mut p) = pb {
+            p.add(len as u64);
+        }
+    }
 }
 
 fn main() {
     let opt = Opt::from_args();
     println!("{:#?}", opt);
-    sanity_check(&opt);
-    copy_stuff(&opt);
+    let src_len = sanity_check(&opt);
+    copy_stuff(&opt, src_len);
 }
 
 #[cfg(test)]
