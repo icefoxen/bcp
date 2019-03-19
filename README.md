@@ -20,3 +20,5 @@ output file already exists" being classified as a conversion, a
 default block size of 512 bytes because that's how big hard drive
 blocks were on a PDP-11, or the ability to have it catch a `SIGUSR1`
 and print I/O statistics.  I want it to copy bytes, and that's all.
+
+...Okay, and have a progress bar.  But that's it.  Honest!
