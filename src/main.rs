@@ -1,3 +1,6 @@
+//! A small tool similar to the useful parts of the Unix program `dd`.
+//! See the [crates.io page](https://crates.io/crates/bcp) for more info.
+
 use std::fs;
 use std::io::{self, Read, Seek, Write};
 use std::path::PathBuf;
@@ -9,6 +12,7 @@ use structopt::{clap::AppSettings, StructOpt};
 /// Size of the copy buffer to use: 1 MB.
 const BUFSIZE: usize = 1024 * 1024;
 
+/// Command line options.
 #[derive(Debug, StructOpt)]
 #[structopt(raw(global_settings = "&[AppSettings::DeriveDisplayOrder]"))]
 struct Opt {
@@ -86,10 +90,8 @@ fn sanity_check(opt: &Opt) -> u64 {
         if dst_metadata.len() < opt.dst_offset {
             error("destination offset > destination file size");
         }
-    } else {
-        if opt.dst_offset > 0 {
-            error("destination file cannot have an offset if the file does not exist; the results of trying to seek past the end of a file are system-defined and thus probably not what you want.")
-        }
+    } else if opt.dst_offset > 0 {
+        error("destination file cannot have an offset if the file does not exist; the results of trying to seek past the end of a file are system-defined and thus probably not what you want.")
     }
 
     src_len
@@ -116,11 +118,12 @@ fn copy_stuff(opt: &Opt, src_len: u64) {
     let mut src = src.take(copy_len);
 
     // Basically stolen from io::copy().
-    // We want a little more control over what's happening.
+    // We want a little more control over what's happening
+    // than that gives us.
     let mut pb = if opt.verbose {
-        let mut bar = pbr::ProgressBar::new(copy_len);
-        bar.set_units(pbr::Units::Bytes);
-        Some(bar)
+        let mut progress = pbr::ProgressBar::new(copy_len);
+        progress.set_units(pbr::Units::Bytes);
+        Some(progress)
     } else {
         None
     };
@@ -147,7 +150,6 @@ fn copy_stuff(opt: &Opt, src_len: u64) {
 
 fn main() {
     let opt = Opt::from_args();
-    //println!("{:#?}", opt);
     let src_len = sanity_check(&opt);
     copy_stuff(&opt, src_len);
 }
