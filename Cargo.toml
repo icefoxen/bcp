@@ -1,6 +1,6 @@
 [package]
 name = "bcp"
-version = "0.3.1"
+version = "0.4.0"
 authors = ["Simon Heath <icefox@dreamquest.io>"]
 edition = "2018"
 description = "A convenient program for copying blocks of bytes within files."

@@ -20,7 +20,7 @@ dependencies = [
 
 [[package]]
 name = "bcp"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "pbr 1.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "structopt 0.2.15 (registry+https://github.com/rust-lang/crates.io-index)",

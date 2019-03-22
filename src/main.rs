@@ -9,9 +9,6 @@ use std::process;
 use pbr;
 use structopt::{clap::AppSettings, StructOpt};
 
-/// Size of the copy buffer to use: 1 MB.
-const BUFSIZE: usize = 1024 * 1024;
-
 /// Command line options.
 #[derive(Debug, StructOpt)]
 #[structopt(raw(global_settings = "&[AppSettings::DeriveDisplayOrder]"))]
@@ -35,6 +32,10 @@ struct Opt {
     /// must exist.
     #[structopt(short = "d", long = "dst-offset", default_value = "0")]
     dst_offset: u64,
+
+    /// Size of the read/write buffer to use.
+    #[structopt(short = "b", long = "buffer-size", default_value = "1048576")]
+    buffer_size: usize,
 
     /// The number of bytes to copy.  Defaults to "all of them",
     /// from the `src-offset` to the end of the file.  Asking to
@@ -94,6 +95,10 @@ fn sanity_check(opt: &Opt) -> u64 {
         error("destination file cannot have an offset if the file does not exist; the results of trying to seek past the end of a file are system-defined and thus probably not what you want.")
     }
 
+    if opt.buffer_size == 0 {
+        error("buffer size = 0.  Finishing your copy would take a long, long time.");
+    }
+
     src_len
 }
 
@@ -127,7 +132,7 @@ fn copy_stuff(opt: &Opt, src_len: u64) {
     } else {
         None
     };
-    let mut buf = vec![0; BUFSIZE];
+    let mut buf = vec![0; opt.buffer_size];
     loop {
         let len = match src.read(&mut buf) {
             Ok(0) => break,
